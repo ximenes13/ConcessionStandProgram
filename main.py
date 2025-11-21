@@ -1,7 +1,15 @@
-import tkinter as tk
+"""
+Modern ttk Snack Menu (Option B)
+- Fully ttk-based (ttk.Style, ttk.Button, ttk.Frame, ttk.Treeview)
+- Light and Dark themes with live switching
+- Hover effects for menu buttons
+- macOS-friendly (uses 'clam' theme and custom style config)
+"""
 
-# ---------------- Menu Data ----------------
-menu = {
+import tkinter as tk
+from tkinter import ttk
+
+MENU = {
     "🍕 Pizza": 3.00,
     "🥨 Nachos": 4.50,
     "🍿 Popcorn": 5.00,
@@ -13,160 +21,210 @@ menu = {
     "💧 Water": 2.99
 }
 
-cart = []
-buttons_list = []
-
-# ---------------- Theme Data ----------------
-themes = {
+THEMES = {
     "Light": {
         "bg": "#e3f6fd",
-        "frame_bg": "#f8f9fa",
+        "panel": "#f8f9fa",
         "cart_bg": "#fffbe7",
         "fg": "#22223b",
-        "button_bg": "#caf0f8",
-        "button_fg": "#253655"
+        "accent": "#448aff",
+        "muted": "#9aa7b3"
     },
     "Dark": {
         "bg": "#253655",
-        "frame_bg": "#32475b",
+        "panel": "#32475b",
         "cart_bg": "#22223b",
         "fg": "#e0eafc",
-        "button_bg": "#448aff",
-        "button_fg": "#f8f9fa"
+        "accent": "#ffd966",
+        "muted": "#9aa7b3"
     }
 }
-current_theme = "Light"
 
-# ---------------- Functions ----------------
-def add_to_cart(item):
-    cart.append(item)
-    update_cart()
+class SnackApp(ttk.Frame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.style = ttk.Style(master)
+        # Use a consistent theme that allows color overrides
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            # fallback if clam not available
+            self.style.theme_use(self.style.theme_names()[0])
 
-def update_cart():
-    cart_list.delete(0, tk.END)
-    total = 0
-    for item in cart:
-        cart_list.insert(tk.END, f"{item} - {menu[item]:.2f}€")
-        total += menu[item]
-    total_label.config(text=f"Total: {total:.2f}€")
+        self.current_theme = "Dark"
+        self.cart = []
 
-def clear_cart():
-    cart.clear()
-    update_cart()
+        # Configure root window
+        master.title("🍕 Snack Menu (ttk modern)")
+        master.geometry("1000x860")
+        master.resizable(False, False)
+        master.tk.call('tk', 'scaling', 1.0)
 
-def apply_theme(theme_name):
-    global current_theme
-    current_theme = theme_name
-    theme = themes[theme_name]
+        # Build UI
+        self.build_styles()
+        self.create_widgets()
+        self.apply_theme(self.current_theme)
 
-    root.configure(bg=theme["bg"])
-    menu_frame.configure(bg=theme["frame_bg"])
-    cart_frame.configure(bg=theme["frame_bg"])
-    cart_list.configure(bg=theme["cart_bg"], fg=theme["fg"], selectbackground=theme["button_bg"])
-    cart_scroll.configure(bg=theme["cart_bg"], troughcolor=theme["frame_bg"])
-    total_label.configure(bg=theme["frame_bg"], fg=theme["fg"])
-    clear_btn.configure(bg=theme["button_bg"], fg=theme["button_fg"],
-                        activebackground=theme["bg"], activeforeground=theme["button_fg"])
-    menu_label.configure(bg=theme["frame_bg"], fg=theme["fg"])
-    order_label.configure(bg=theme["frame_bg"], fg=theme["fg"])
-    for btn in buttons_list:
-        btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
-                   activebackground=theme["bg"], activeforeground=theme["button_fg"],
-                   highlightbackground=theme["bg"])
-    dark_btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
-                    activebackground=theme["bg"], activeforeground=theme["button_fg"])
-    light_btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
-                     activebackground=theme["bg"], activeforeground=theme["button_fg"])
+    def build_styles(self):
+        # Base styles for frames, labels, buttons
+        self.style.configure("App.TFrame", background=THEMES[self.current_theme]["bg"])
+        self.style.configure("Panel.TLabelframe", background=THEMES[self.current_theme]["panel"], borderwidth=2, relief="solid")
+        self.style.configure("Panel.TLabelframe.Label", background=THEMES[self.current_theme]["panel"], foreground=THEMES[self.current_theme]["fg"], font=("Segoe UI", 18, "bold"))
+        self.style.configure("Heading.TLabel", background=THEMES[self.current_theme]["panel"], foreground=THEMES[self.current_theme]["fg"], font=("Segoe UI", 22, "bold"))
+        self.style.configure("TButton", relief="flat", padding=6)
+        self.style.configure("Menu.TButton", font=("Segoe UI", 13, "bold"), padding=(12,10))
+        self.style.configure("Accent.TButton", font=("Segoe UI", 12, "bold"), padding=(12,8))
+        self.style.configure("Total.TLabel", background=THEMES[self.current_theme]["panel"], foreground=THEMES[self.current_theme]["fg"], font=("Segoe UI", 16, "bold"))
 
-# ---------------- GUI Setup ----------------
-root = tk.Tk()
-root.title("🍕 Snack Menu")
-root.geometry("1000x890")
-root.resizable(False, False)
-root.configure(bg=themes[current_theme]["bg"])
+        # Treeview (cart) styling
+        self.style.configure("Cart.Treeview", background=THEMES[self.current_theme]["cart_bg"],
+                             fieldbackground=THEMES[self.current_theme]["cart_bg"],
+                             foreground=THEMES[self.current_theme]["fg"],
+                             rowheight=26,
+                             font=("Segoe UI", 12))
+        self.style.layout("Cart.Treeview", self.style.layout("Treeview"))
 
-# --- Menu Frame ---
-menu_frame = tk.LabelFrame(root, text="", padx=22, pady=16, font=("Segoe UI", 12, "bold"),
-                          bg=themes[current_theme]["frame_bg"],
-                          highlightbackground="#cff4fc", highlightthickness=2, bd=0)
-menu_frame.pack(padx=24, pady=20, fill="both")
+    def create_widgets(self):
+        # Outer frame
+        self.pack(fill="both", expand=True)
+        self["style"] = "App.TFrame"
 
-menu_label = tk.Label(menu_frame, text="Menu", font=("Segoe UI", 21, "bold"),
-                      bg=themes[current_theme]["frame_bg"], fg=themes[current_theme]["fg"],
-                      anchor="center", justify="center")
-menu_label.grid(row=0, column=0, columnspan=2, pady=(0, 12), sticky="ew")
+        # Menu panel
+        self.menu_panel = ttk.LabelFrame(self, text="Menu", padding=(20,18), style="Panel.TLabelframe")
+        self.menu_panel.pack(padx=20, pady=(20,12), fill="x")
 
-menu_frame.grid_columnconfigure(0, weight=1)
-menu_frame.grid_columnconfigure(1, weight=1)
+        # Create two-column grid for menu buttons
+        menu_inner = ttk.Frame(self.menu_panel, style="App.TFrame")
+        menu_inner.pack(fill="x", padx=8, pady=(6,2))
+        # configure grid columns for responsiveness
+        menu_inner.columnconfigure(0, weight=1)
+        menu_inner.columnconfigure(1, weight=1)
 
+        self.menu_buttons = []
+        items = list(MENU.items())
+        for idx, (name, price) in enumerate(items):
+            text = f"{name} - {price:.2f}€"
+            btn = ttk.Button(menu_inner, text=text, style="Menu.TButton",
+                             command=lambda n=name: self.add_to_cart(n))
+            btn.grid(row=idx//2, column=idx%2, padx=10, pady=8, sticky="ew")
+            # hover effects (change background via map)
+            btn.bind("<Enter>", lambda e, b=btn: b.state(["active"]))
+            btn.bind("<Leave>", lambda e, b=btn: b.state(["!active"]))
+            self.menu_buttons.append(btn)
 
-# --- Create menu buttons in two columns ---
-for idx, (item, price) in enumerate(menu.items()):
-    btn = tk.Button(menu_frame, text=f"{item} - {price:.2f}€", width=25,
-                    font=("Segoe UI", 13, "bold"),
-                    command=lambda i=item: add_to_cart(i),
-                    bg=themes[current_theme]["button_bg"],
-                    fg=themes[current_theme]["button_fg"],
-                    bd=0,
-                    relief='ridge',
-                    highlightbackground="#cff4fc",
-                    highlightthickness=1)
-    row = idx // 2 + 1  # +1 because menu_label is in row 0
-    col = idx % 2
-    btn.grid(row=row, column=col, padx=12, pady=6, sticky="ew")
-    buttons_list.append(btn)
+        # Cart panel
+        self.cart_panel = ttk.LabelFrame(self, text="Your Order", padding=(20,18), style="Panel.TLabelframe")
+        self.cart_panel.pack(padx=20, pady=(12,8), fill="both", expand=True)
 
-# --- Cart Frame ---
-cart_frame = tk.LabelFrame(root, text="", padx=22, pady=16, font=("Segoe UI", 12, "bold"),
-                          bg=themes[current_theme]["frame_bg"],
-                          highlightbackground="#ffeebf", highlightthickness=2, bd=0)
-cart_frame.pack(padx=24, pady=2, fill="both")
+        # Centered cart area
+        cart_center = ttk.Frame(self.cart_panel, style="App.TFrame")
+        cart_center.pack(expand=True)
 
-order_label = tk.Label(cart_frame, text="Your Order", font=("Segoe UI", 18, "bold"),
-                       bg=themes[current_theme]["frame_bg"], fg=themes[current_theme]["fg"])
-order_label.pack(pady=(0, 8))
+        # Treeview for cart (2 columns: item, price)
+        self.cart_tree = ttk.Treeview(cart_center, columns=("item", "price"), show="headings", height=6, style="Cart.Treeview")
+        self.cart_tree.column("item", anchor="center", width=360)
+        self.cart_tree.column("price", anchor="center", width=120)
+        self.cart_tree.heading("item", text="Item")
+        self.cart_tree.heading("price", text="Price")
+        self.cart_tree.grid(row=0, column=0, padx=(80,0), pady=6)
 
-# -- Listbox with Scrollbar --
-listbox_frame = tk.Frame(cart_frame, bg=themes[current_theme]["frame_bg"])
-listbox_frame.pack()
+        # Scrollbar for treeview
+        self.cart_scroll = ttk.Scrollbar(cart_center, orient="vertical", command=self.cart_tree.yview)
+        self.cart_tree.configure(yscrollcommand=self.cart_scroll.set)
+        self.cart_scroll.grid(row=0, column=1, sticky="ns", padx=(6,80), pady=6)
 
-cart_list = tk.Listbox(listbox_frame, width=28, height=8, font=("Segoe UI", 13),
-                       bg=themes[current_theme]["cart_bg"], fg=themes[current_theme]["fg"],
-                       bd=0, highlightthickness=1, highlightbackground="#ffeebf")
-cart_list.pack(side=tk.LEFT, fill=tk.BOTH)
+        # Total label
+        self.total_label = ttk.Label(cart_center, text="Total: 0.00€", style="Total.TLabel")
+        self.total_label.grid(row=1, column=0, columnspan=2, pady=(12,6))
 
-cart_scroll = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL, command=cart_list.yview)
-cart_list.config(yscrollcommand=cart_scroll.set)
-cart_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        # Clear cart button
+        self.clear_btn = ttk.Button(cart_center, text="Clear Cart", style="Accent.TButton", command=self.clear_cart)
+        self.clear_btn.grid(row=2, column=0, columnspan=2, pady=(6,18))
+        # Theme switcher frame at the bottom
+        theme_bar = ttk.Frame(self, style="App.TFrame")
+        theme_bar.pack(fill="x", padx=10, pady=(6,16))
+        theme_bar.columnconfigure(0, weight=1)
+        theme_bar.columnconfigure(1, weight=1)
+        self.light_btn = ttk.Button(theme_bar, text="🌤 Light Theme", style="Accent.TButton", command=lambda: self.apply_theme("Light"))
+        self.light_btn.grid(row=0, column=0, sticky="w", padx=(60,0))
+        self.dark_btn = ttk.Button(theme_bar, text="🌙 Dark Theme", style="Accent.TButton", command=lambda: self.apply_theme("Dark"))
+        self.dark_btn.grid(row=0, column=1, sticky="e", padx=(0,60))
 
-total_label = tk.Label(cart_frame, text="Total: 0.00€", font=("Segoe UI", 15, "bold"),
-                       bg=themes[current_theme]["frame_bg"], fg=themes[current_theme]["fg"])
-total_label.pack(pady=8)
+    # ----------------- Cart logic -----------------
+    def add_to_cart(self, item_name):
+        self.cart.append(item_name)
+        self.refresh_cart()
 
-clear_btn = tk.Button(cart_frame, text="Clear Cart", font=("Segoe UI", 12, "bold"),
-                      command=clear_cart,
-                      bg=themes[current_theme]["button_bg"],
-                      fg=themes[current_theme]["button_fg"],
-                      bd=0, highlightbackground="#ffeebf")
-clear_btn.pack(pady=5)
+    def refresh_cart(self):
+        # clear tree
+        for row in self.cart_tree.get_children():
+            self.cart_tree.delete(row)
+        total = 0
+        for item in self.cart:
+            price = MENU[item]
+            total += price
+            self.cart_tree.insert("", "end", values=(item, f"{price:.2f}€"))
+        self.total_label.config(text=f"Total: {total:.2f}€")
 
-# --- Theme Buttons Frame ---
-theme_frame = tk.Frame(root, bg=themes[current_theme]["bg"])
-theme_frame.pack(pady=16, fill="x")
+    def clear_cart(self):
+        self.cart.clear()
+        self.refresh_cart()
 
-light_btn = tk.Button(theme_frame, text="🌤 Light Theme", font=("Segoe UI", 12, "bold"),
-                      command=lambda: apply_theme("Light"),
-                      bg=themes["Light"]["button_bg"], fg=themes["Light"]["button_fg"],
-                      bd=0, highlightbackground=themes["Light"]["bg"])
-light_btn.pack(side=tk.LEFT, padx=(60,12), pady=4)
+    # ----------------- Theme application -----------------
+    def apply_theme(self, theme_name):
+        if theme_name not in THEMES:
+            return
+        self.current_theme = theme_name
+        t = THEMES[theme_name]
 
-dark_btn = tk.Button(theme_frame, text="🌙 Dark Theme", font=("Segoe UI", 12, "bold"),
-                     command=lambda: apply_theme("Dark"),
-                     bg=themes["Dark"]["button_bg"], fg=themes["Dark"]["button_fg"],
-                     bd=0, highlightbackground=themes["Dark"]["bg"])
-dark_btn.pack(side=tk.LEFT, padx=12, pady=4)
+        # Root window bg
+        self.master.configure(bg=t["bg"])
+        self.style.configure("App.TFrame", background=t["bg"])
 
-apply_theme("Light")
+        # Panel styles
+        self.style.configure("Panel.TLabelframe", background=t["panel"], bordercolor=t["accent"])
+        self.style.configure("Panel.TLabelframe.Label", background=t["panel"], foreground=t["fg"])
+        self.style.configure("Heading.TLabel", background=t["panel"], foreground=t["fg"])
 
-# ---------------- Run App ----------------
-root.mainloop()
+        # Menu button style
+        self.style.configure("Menu.TButton",
+                             background=t["panel"],
+                             foreground=t["fg"],
+                             borderwidth=0,
+                             focuscolor='none')
+        # Provide map for active state to create hover feel
+        self.style.map("Menu.TButton",
+                       background=[("active", t["accent"]), ("!active", t["panel"])],
+                       foreground=[("active", t["panel"]), ("!active", t["fg"])])
+
+        # Accent buttons (clear, theme switch)
+        self.style.configure("Accent.TButton",
+                             background=t["accent"],
+                             foreground=t["panel"],
+                             font=("Segoe UI", 11, "bold"))
+        self.style.map("Accent.TButton",
+                       background=[("active", t["panel"]), ("!active", t["accent"])],
+                       foreground=[("active", t["accent"]), ("!active", t["panel"])])
+
+        # Cart/tree style
+        self.style.configure("Cart.Treeview",
+                             background=t["cart_bg"],
+                             fieldbackground=t["cart_bg"],
+                             foreground=t["fg"])
+        # Scrollbar styling (ttk uses system look but this keeps it consistent)
+        self.style.configure("Vertical.TScrollbar", troughcolor=t["panel"])
+
+        # Update widget backgrounds that don't fully inherit from style
+        for widget in (self.menu_panel, self.cart_panel):
+            widget.configure(style="Panel.TLabelframe")
+
+        # Labels & total
+        self.total_label.configure(style="Total.TLabel")
+        # Refresh colors for tree and buttons by forcing a redraw
+        self.refresh_cart()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = SnackApp(root)
+    root.mainloop()
