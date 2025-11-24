@@ -53,10 +53,10 @@ class SnackApp(ttk.Frame):
             self.style.theme_use(self.style.theme_names()[0])
 
         self.current_theme = "Dark"
-        self.cart = []
+        self.cart = {}   # item_name -> quantity
 
         # Configure root window
-        master.title("🍕 Snack Menu (ttk modern)")
+        master.title("🍕 Snack Menu")
         master.geometry("1000x860")
         master.resizable(False, False)
         master.tk.call('tk', 'scaling', 1.0)
@@ -151,24 +151,46 @@ class SnackApp(ttk.Frame):
         self.dark_btn = ttk.Button(theme_bar, text="🌙 Dark Theme", style="Accent.TButton", command=lambda: self.apply_theme("Dark"))
         self.dark_btn.grid(row=0, column=1, sticky="e", padx=(0,60))
 
+        # Remove selected button
+        self.remove_btn = ttk.Button(cart_center, text="Remove Selected",
+                                     style="Accent.TButton", command=self.remove_selected)
+        self.remove_btn.grid(row=3, column=0, columnspan=2, pady=(0, 10))
+
     # ----------------- Cart logic -----------------
     def add_to_cart(self, item_name):
-        self.cart.append(item_name)
+        if item_name not in self.cart:
+            self.cart[item_name] = 1
+        else:
+            self.cart[item_name] += 1
         self.refresh_cart()
 
     def refresh_cart(self):
-        # clear tree
         for row in self.cart_tree.get_children():
             self.cart_tree.delete(row)
+
         total = 0
-        for item in self.cart:
+        for item, qty in self.cart.items():
             price = MENU[item]
-            total += price
-            self.cart_tree.insert("", "end", values=(item, f"{price:.2f}€"))
+            subtotal = qty * price
+            total += subtotal
+            self.cart_tree.insert("", "end",
+                                  values=(f"{item} x{qty}",
+                                          f"{subtotal:.2f}€"))
         self.total_label.config(text=f"Total: {total:.2f}€")
 
     def clear_cart(self):
         self.cart.clear()
+        self.refresh_cart()
+
+    def remove_selected(self):
+        sel = self.cart_tree.selection()
+        if not sel:
+            return
+        item_display = self.cart_tree.item(sel[0])["values"][0]
+        item_name = item_display.split(" x")[0]  # remove qty
+
+        if item_name in self.cart:
+            del self.cart[item_name]
         self.refresh_cart()
 
     # ----------------- Theme application -----------------
